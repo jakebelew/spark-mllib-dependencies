@@ -113,20 +113,17 @@ class CrossValidator(override val uid: String) extends Estimator[CrossValidatorM
     val metrics = new Array[Double](epm.length)
     val splits = MLUtils.kFold(dataset.rdd, $(numFolds), 0)
     splits.zipWithIndex.foreach { case ((training, validation), splitIndex) =>
-println("CrossValidator - new Fold")      
       val trainingDataset = sqlCtx.createDataFrame(training, schema).cache()
       val validationDataset = sqlCtx.createDataFrame(validation, schema).cache()
       // multi-model training
       logDebug(s"Train split $splitIndex with multiple sets of parameters.")
-      //println(s"CV trainingDataset: ${trainingDataset.collect.mkString("\n")}")
       val models = est.fit(trainingDataset, epm).asInstanceOf[Seq[Model[_]]]
       trainingDataset.unpersist()
       var i = 0
       while (i < numModels) {
         // TODO: duplicate evaluator to take extra params from input
         val metric = eval.evaluate(models(i).transform(validationDataset, epm(i)))
-        //logDebug(s"Got metric $metric for model trained with ${epm(i)}.")
-        println(s"Got metric $metric for model trained with ${epm(i)}.")
+        logDebug(s"Got metric $metric for model trained with ${epm(i)}.")
         metrics(i) += metric
         i += 1
       }
@@ -137,10 +134,6 @@ println("CrossValidator - new Fold")
     val (bestMetric, bestIndex) = metrics.zipWithIndex.maxBy(_._1)
     logInfo(s"Best set of parameters:\n${epm(bestIndex)}")
     logInfo(s"Best cross-validation metric: $bestMetric.")
-    println(s"Best set of parameters:\n${epm(bestIndex)}")
-println(s"Best cross-validation metric: $bestMetric.")
-println("CrossValidator - Best Model")      
-      //println(s"CV dataset: ${dataset.collect.mkString("\n")}")
     val bestModel = est.fit(dataset, epm(bestIndex)).asInstanceOf[Model[_]]
     copyValues(new CrossValidatorModel(uid, bestModel).setParent(this))
   }
